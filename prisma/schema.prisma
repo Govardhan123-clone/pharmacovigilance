@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int           @id @default(autoincrement())
+  name          String
+  email         String        @unique
+  password      String
+  questions     Question[]
+  answers       Answer[]
+  comments      Comment[]
+  votes         Vote[]
+  notifications Notification[]  // Add this line to complete the relation
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Question {
+  id            Int        @id @default(autoincrement())
+  title         String
+  content       String
+  userId        Int
+  user          User       @relation(fields: [userId], references: [id])
+  answers       Answer[]
+  comments      Comment[]
+  votes         Vote[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Answer {
+  id            Int        @id @default(autoincrement())
+  content       String
+  userId        Int
+  questionId    Int
+  user          User       @relation(fields: [userId], references: [id])
+  question      Question   @relation(fields: [questionId], references: [id])
+  comments      Comment[]
+  votes         Vote[]
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Comment {
+  id            Int        @id @default(autoincrement())
+  content       String
+  userId        Int
+  questionId    Int?
+  answerId      Int?
+  user          User       @relation(fields: [userId], references: [id])
+  question      Question?  @relation(fields: [questionId], references: [id])
+  answer        Answer?    @relation(fields: [answerId], references: [id])
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+}
+
+model Vote {
+  id            Int        @id @default(autoincrement())
+  userId        Int
+  questionId    Int?
+  answerId      Int?
+  voteType      VoteType   @default(UP)
+  user          User       @relation(fields: [userId], references: [id])
+  question      Question?  @relation(fields: [questionId], references: [id])
+  answer        Answer?    @relation(fields: [answerId], references: [id])
+  createdAt     DateTime   @default(now())
+}
+
+enum VoteType {
+  UP
+  DOWN
+}
+
+model Patient {
+  id            Int        @id @default(autoincrement())
+  name          String
+  age           Int
+  reports       Report[]
+}
+
+model Drug {
+  id            Int        @id @default(autoincrement())
+  name          String
+  description   String
+  reports       Report[]
+}
+
+model Report {
+  id            Int        @id @default(autoincrement())
+  description   String
+  patientId     Int
+  drugId        Int
+  patient       Patient    @relation(fields: [patientId], references: [id])
+  drug          Drug       @relation(fields: [drugId], references: [id])
+  createdAt     DateTime   @default(now())
+}
+
+model Notification {
+  id            Int           @id @default(autoincrement())
+  content       String
+  userId        Int
+  user          User          @relation(fields: [userId], references: [id])
+  createdAt     DateTime      @default(now())
+}
