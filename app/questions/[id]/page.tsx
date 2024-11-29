@@ -1,115 +1,135 @@
-"use client"
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/router";
+"use client";
 
-const QuestionDetail = () => {
-  const router = useRouter();
-  const { id } = router.query;
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 
-  const [question, setQuestion] = useState<any>(null);
-  const [comments, setComments] = useState<any[]>([]);
-  const [newComment, setNewComment] = useState<string>("");
-  const [likes, setLikes] = useState<number>(0);
-  const [dislikes, setDislikes] = useState<number>(0);
+export default function QuestionDetails() {
+  const [question, setQuestion] = useState(null);
+  const [answers, setAnswers] = useState([]);
+  const [answerContent, setAnswerContent] = useState("");
+  const { id } = useParams(); // Get dynamic route parameter `id`
 
+  // Fetch the question and its answers
   useEffect(() => {
     if (id) {
-      // Fetch question details
-      fetch(`/api/questions/${id}`)
-        .then((res) => res.json())
-        .then((data) => {
-          setQuestion(data);
-          setLikes(data.likes || 0);
-          setDislikes(data.dislikes || 0);
-        });
+      const fetchQuestion = async () => {
+        try {
+          const res = await fetch(`/api/questions/${id}`);
+          const data = await res.json();
+          if (res.ok) {
+            setQuestion(data);
+          } else {
+            console.error("Error fetching question:", data.error);
+          }
+        } catch (err) {
+          console.error("Error fetching question:", err);
+        }
+      };
 
-      // Fetch comments
-      fetch(`/api/comments/${id}`)
-        .then((res) => res.json())
-        .then((data) => setComments(data));
+      const fetchAnswers = async () => {
+        try {
+          const res = await fetch(`/api/answers?questionId=${id}`);
+          const data = await res.json();
+          if (res.ok) {
+            setAnswers(data.answers);
+          } else {
+            console.error("Error fetching answers:", data.error);
+          }
+        } catch (err) {
+          console.error("Error fetching answers:", err);
+        }
+      };
+
+      fetchQuestion();
+      fetchAnswers();
     }
   }, [id]);
 
-  const handleAddComment = async () => {
-    if (!newComment.trim()) return;
+  // Submit a new answer
+  const handleAnswerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch("/api/answers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: answerContent, userId: 1, questionId: parseInt(id) }),
+      });
 
-    const response = await fetch(`/api/comments/${id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: newComment }),
-    });
-
-    if (response.ok) {
-      const addedComment = await response.json();
-      setComments((prev) => [...prev, addedComment]);
-      setNewComment("");
+      if (res.ok) {
+        const newAnswer = await res.json();
+        setAnswers((prev) => [...prev, newAnswer.answer]);
+        setAnswerContent(""); // Reset input field
+      } else {
+        console.error("Error submitting answer:", await res.json());
+      }
+    } catch (err) {
+      console.error("Error submitting answer:", err);
     }
   };
 
-  const handleLike = async () => {
-    const response = await fetch(`/api/questions/${id}/like`, { method: "POST" });
-    if (response.ok) setLikes((prev) => prev + 1);
+  // Handle voting for both question and answers
+  const handleVote = async (voteType: "UP" | "DOWN", answerId?: number) => {
+    try {
+      const res = await fetch("/api/votes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: 1, // Replace with logged-in user ID
+          questionId: answerId ? undefined : id,
+          answerId: answerId || undefined,
+          voteType,
+        }),
+      });
+
+      if (res.ok) {
+        console.log("Vote submitted successfully");
+      } else {
+        console.error("Error submitting vote:", await res.json());
+      }
+    } catch (error) {
+      console.error("Error submitting vote:", error);
+    }
   };
 
-  const handleDislike = async () => {
-    const response = await fetch(`/api/questions/${id}/dislike`, { method: "POST" });
-    if (response.ok) setDislikes((prev) => prev + 1);
-  };
-
-  if (!question) return <p>Loading...</p>;
+  // If question data is not loaded yet, show a loading state
+  if (!question) return <div>Loading...</div>;
 
   return (
-    <div style={styles.container}>
-      {/* Question Section */}
-      <div style={styles.questionSection}>
-        <h1 style={styles.questionTitle}>{question.title}</h1>
-        <p style={styles.questionDescription}>{question.description}</p>
-        <div style={styles.reactions}>
-          <button onClick={handleLike} style={styles.likeButton}>👍 {likes}</button>
-          <button onClick={handleDislike} style={styles.dislikeButton}>👎 {dislikes}</button>
-        </div>
+    <div>
+      {/* Question Details */}
+      <h1>{question.title}</h1>
+      <p>{question.content}</p>
+
+      {/* Voting for Question */}
+      <div>
+        <button onClick={() => handleVote("UP")}>Upvote Question</button>
+        <button onClick={() => handleVote("DOWN")}>Downvote Question</button>
       </div>
 
-      {/* Comments Section */}
-      <div style={styles.commentsSection}>
-        <h2>Comments</h2>
-        <div style={styles.commentList}>
-          {comments.map((comment) => (
-            <div key={comment.id} style={styles.comment}>
-              <p>
-                <strong>{comment.author || "Anonymous"}</strong>: {comment.content}
-              </p>
+      {/* Answers Section */}
+      <h2>Answers</h2>
+      <ul>
+        {answers.map((answer) => (
+          <li key={answer.id}>
+            {answer.content}
+            <div>
+              <button onClick={() => handleVote("UP", answer.id)}>Upvote</button>
+              <button onClick={() => handleVote("DOWN", answer.id)}>Downvote</button>
             </div>
-          ))}
-        </div>
-        <div style={styles.addComment}>
-          <textarea
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Add a comment..."
-            style={styles.textArea}
-          />
-          <button onClick={handleAddComment} style={styles.addCommentButton}>Add Comment</button>
-        </div>
-      </div>
+          </li>
+        ))}
+      </ul>
+
+      {/* Submit New Answer */}
+      <form onSubmit={handleAnswerSubmit}>
+        <textarea
+          value={answerContent}
+          onChange={(e) => setAnswerContent(e.target.value)}
+          placeholder="Write your answer here"
+          required
+        />
+        <button type="submit">Submit Answer</button>
+      </form>
     </div>
   );
-};
-
-const styles = {
-  container: { maxWidth: "800px", margin: "0 auto", padding: "20px" },
-  questionSection: { marginBottom: "30px" },
-  questionTitle: { fontSize: "24px", fontWeight: "bold" },
-  questionDescription: { fontSize: "16px", margin: "10px 0" },
-  reactions: { display: "flex", gap: "10px", marginTop: "10px" },
-  likeButton: { padding: "5px 10px", backgroundColor: "#28a745", color: "#fff", border: "none", borderRadius: "5px" },
-  dislikeButton: { padding: "5px 10px", backgroundColor: "#dc3545", color: "#fff", border: "none", borderRadius: "5px" },
-  commentsSection: { marginTop: "20px" },
-  commentList: { marginBottom: "20px" },
-  comment: { marginBottom: "10px", padding: "10px", border: "1px solid #ddd", borderRadius: "5px" },
-  addComment: { display: "flex", flexDirection: "column", gap: "10px" },
-  textArea: { width: "100%", padding: "10px", border: "1px solid #ddd", borderRadius: "5px" },
-  addCommentButton: { padding: "10px", backgroundColor: "#007bff", color: "#fff", border: "none", borderRadius: "5px" },
-};
-
-export default QuestionDetail;
+}

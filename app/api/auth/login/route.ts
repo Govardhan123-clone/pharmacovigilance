@@ -1,44 +1,46 @@
-// pages/api/auth/login.ts
-
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { NextApiRequest, NextApiResponse } from 'next';
+import prisma from '@/app/lib/prisma';
 
-const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret"; // Replace with a secure secret key
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method === 'POST') {
-    const { email, password } = req.body;
+export async function POST(request: Request) {
+  try {
+    const { email, password } = await request.json();
 
-    try {
-      // Check if the user exists in the database
-      const user = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (!user) {
-        return res.status(401).json({ message: 'Invalid email or password' });
-      }
-
-      // Compare the provided password with the hashed password in the database
-      const isPasswordValid = await bcrypt.compare(password, user.password);
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: 'Invalid email or password' });
-      }
-
-      // Generate a token if credentials are valid
-      const token = jwt.sign(
-        { userId: user.id, email: user.email },
-        process.env.JWT_SECRET || 'your-secret-key', // make sure to set JWT_SECRET in .env
-        { expiresIn: '1h' } // Token expiration time
-      );
-
-      res.status(200).json({ token });
-    } catch (error) {
-      res.status(500).json({ message: 'Internal server error' });
+    if (!email || !password) {
+      return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
     }
-  } else {
-    res.status(405).json({ message: 'Method not allowed' });
+
+    // Check if the user exists
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
+    }
+
+    // Compare password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordValid) {
+      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
+    }
+
+    // Generate a JWT
+    const token = jwt.sign(
+      { id: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '1h' } // Token expiration
+    );
+
+    return NextResponse.json({
+      message: 'Login successful.',
+      user: { id: user.id, name: user.name, email: user.email },
+      token,
+    });
+  } catch (error) {
+    console.error('Error during login:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

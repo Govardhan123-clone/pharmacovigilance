@@ -1,91 +1,119 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-const AskQuestionPage = () => {
+export default function CreateQuestion() {
+  const [form, setForm] = useState({
+    title: "",
+    content: "",
+    userId: 1, // Default user ID, replace with actual user data if available
+    tags: [],
+  });
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
   const router = useRouter();
-
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    setSuccess(false);
 
     try {
-      const res = await fetch('/api/questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content }),
+      const response = await fetch("/api/questions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
       });
 
-      // Check for non-JSON or empty response
-      const data = await res.json().catch(() => {
-        throw new Error('Failed to parse JSON response.');
-      });
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to submit question.');
+      if (!response.ok) {
+        // Handle cases where the response JSON might be empty or invalid
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: "An unknown error occurred" };
+        }
+        setError(errorData.error || "Failed to create question.");
+        console.error("Error creating question:", errorData);
+        return;
       }
 
-      console.log('Question submitted successfully:', data);
+      const data = await response.json(); // Parse response JSON if successful
+      console.log("Question created successfully:", data);
+      setSuccess(true);
 
-      // Redirect to questions page
-      router.push('/questions');
-    } catch (err: any) {
-      console.error('Error submitting question:', err.message);
-      setError(err.message || 'There was an error submitting your question.');
+      // Redirect to questions page after a delay to allow the success message to show
+      setTimeout(() => {
+        router.push("/questions");
+      }, 1500);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      setError("Something went wrong. Please try again.");
     }
   };
 
-  return (
-    <div>
-      <h1>Ask a Question</h1>
-      <form onSubmit={handleSubmit} style={{ maxWidth: '600px', margin: '0 auto' }}>
-        {error && <p style={{ color: 'red' }}>{error}</p>}
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
 
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="title" style={{ display: 'block' }}>Title</label>
+  return (
+    <div style={{ maxWidth: "600px", margin: "0 auto", padding: "20px" }}>
+      <h1>Create a New Question</h1>
+
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      {success && <p style={{ color: "green" }}>Question created successfully!</p>}
+
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: "20px" }}>
+          <label htmlFor="title">Question Title</label>
           <input
-            id="title"
             type="text"
-            placeholder="Enter question title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            id="title"
+            name="title"
+            placeholder="Enter your question title"
+            value={form.title}
+            onChange={handleChange}
             required
-            style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px' }}
+            style={{ width: "100%", padding: "8px", marginTop: "5px" }}
           />
         </div>
 
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="content" style={{ display: 'block' }}>Content</label>
+        <div style={{ marginBottom: "20px" }}>
+          <label htmlFor="content">Question Content</label>
           <textarea
             id="content"
-            placeholder="Describe your question"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
+            name="content"
+            placeholder="Provide detailed content for your question"
+            value={form.content}
+            onChange={handleChange}
             required
-            style={{ width: '100%', padding: '8px', border: '1px solid #ccc', borderRadius: '4px', minHeight: '150px' }}
+            style={{
+              width: "100%",
+              padding: "8px",
+              marginTop: "5px",
+              height: "150px",
+            }}
           />
         </div>
 
         <button
           type="submit"
           style={{
-            backgroundColor: '#0070f3',
-            color: 'white',
-            padding: '10px 20px',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
+            padding: "10px 20px",
+            backgroundColor: "#0070f3",
+            color: "#fff",
+            border: "none",
+            borderRadius: "5px",
+            cursor: "pointer",
           }}
         >
-          Submit Question
+          Submit
         </button>
       </form>
     </div>
   );
-};
-
-export default AskQuestionPage;
+}

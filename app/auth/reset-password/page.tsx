@@ -1,18 +1,21 @@
 "use client";
 
 import React, { useState } from "react";
+import { useSearchParams } from "next/navigation";
 
-export default function ForgotPassword() {
-  const [email, setEmail] = useState("");
+export default function ResetPassword() {
+  const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
+  const searchParams = useSearchParams();
+  const resetToken = searchParams.get("token");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch("/api/forgot-password", {
+      const response = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ resetToken, newPassword }),
       });
 
       const data = await response.json();
@@ -24,16 +27,16 @@ export default function ForgotPassword() {
 
   return (
     <div>
-      <h1>Forgot Password</h1>
+      <h1>Reset Password</h1>
       <form onSubmit={handleSubmit}>
         <input
-          type="email"
-          placeholder="Enter your email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          type="password"
+          placeholder="New Password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
           required
         />
-        <button type="submit">Send Reset Link</button>
+        <button type="submit">Reset Password</button>
       </form>
       {message && <p>{message}</p>}
     </div>

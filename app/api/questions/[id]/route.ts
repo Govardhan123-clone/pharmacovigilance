@@ -1,14 +1,25 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import prisma from '../../../lib/prisma';
+import { NextResponse } from "next/server";
+import { prisma } from "@/app/lib/prisma";
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { id } = req.query;
-  
-  if (req.method === 'GET') {
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const questionId = parseInt(params.id);
+
+  try {
     const question = await prisma.question.findUnique({
-      where: { id: Number(id) },
-      include: { answers: { include: { comments: true, votes: true } } }
+      where: { id: questionId },
+      include: {
+        answers: true,
+        user: true,
+      },
     });
-    res.status(200).json(question);
+
+    if (!question) {
+      return NextResponse.json({ error: "Question not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(question);
+  } catch (error) {
+    console.error("Error fetching question:", error);
+    return NextResponse.json({ error: "Failed to fetch question" }, { status: 500 });
   }
 }

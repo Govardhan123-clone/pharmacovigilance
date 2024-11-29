@@ -8,31 +8,78 @@ datasource db {
 }
 
 model User {
-  id            Int           @id @default(autoincrement())
-  name          String
-  email         String        @unique
-  password      String
-  questions     Question[]
-  answers       Answer[]
-  comments      Comment[]
-  votes         Vote[]
-  notifications Notification[]  // Add this line to complete the relation
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id               Int                   @id @default(autoincrement())
+  name             String
+  email            String                @unique
+  password         String
+  country          String
+  company          String?
+  experienceLevel  ExperienceLevel
+  expertiseAreas   Json
+  questions        Question[]
+  answers          Answer[]
+  comments         Comment[]
+  votes            Vote[]
+  notifications    Notification[]
+  mentorshipAsMentor MentorshipSession[] @relation("MentorSessions")
+  mentorshipAsMentee MentorshipSession[] @relation("MenteeSessions")
+  chats            Chat[]                @relation("ChatUsers")
+  messages         Message[]
+  savedQuestions   SavedQuestion[]       // Add this field
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
 }
 
 model Question {
-  id            Int        @id @default(autoincrement())
-  title         String
-  content       String
-  userId        Int
-  user          User       @relation(fields: [userId], references: [id])
-  answers       Answer[]
-  comments      Comment[]
-  votes         Vote[]
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id         Int          @id @default(autoincrement())
+  title      String
+  content    String
+  userId     Int
+  user       User         @relation(fields: [userId], references: [id])
+  answers    Answer[]
+  comments   Comment[]
+  votes      Vote[]
+  tags       Tag[]        // Implicit many-to-many relation
+  savedBy    SavedQuestion[] // Add this field
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
 }
+
+model SavedQuestion {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  questionId Int
+  user       User      @relation(fields: [userId], references: [id])
+  question   Question  @relation(fields: [questionId], references: [id])
+  createdAt  DateTime  @default(now())
+}
+
+
+model Chat {
+  id         Int        @id @default(autoincrement())
+  users      User[]     @relation("ChatUsers") // Many-to-many relation
+  messages   Message[]
+  createdAt  DateTime   @default(now())
+}
+
+model Message {
+  id         Int        @id @default(autoincrement())
+  content    String
+  userId     Int
+  chatId     Int
+  user       User       @relation(fields: [userId], references: [id]) // Relation to User
+  chat       Chat       @relation(fields: [chatId], references: [id]) // Relation to Chat
+  createdAt  DateTime   @default(now())
+}
+
+model Tag {
+  id         Int          @id @default(autoincrement())
+  name       String       @unique
+  description String?
+  questions  Question[]   // Implicit many-to-many relation
+  createdAt  DateTime     @default(now())
+}
+
 
 model Answer {
   id            Int        @id @default(autoincrement())
@@ -108,3 +155,26 @@ model Notification {
   user          User          @relation(fields: [userId], references: [id])
   createdAt     DateTime      @default(now())
 }
+
+model MentorshipSession {
+  id            Int           @id @default(autoincrement())
+  mentorId      Int
+  menteeId      Int
+  sessionDate   DateTime
+  duration      Int
+  sessionNotes  String?
+  createdAt     DateTime       @default(now())
+  mentor        User           @relation("MentorSessions", fields: [mentorId], references: [id])
+  mentee        User           @relation("MenteeSessions", fields: [menteeId], references: [id])
+}
+
+enum ExperienceLevel {
+  Novice
+  AdvancedBeg
+  Competent
+  Proficient
+  Expert
+}
+
+
+

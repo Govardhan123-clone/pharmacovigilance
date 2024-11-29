@@ -1,90 +1,49 @@
 "use client";
 
-import { useState } from "react";
-import { useSession, signOut } from "next-auth/react";
+import React, { useState } from "react";
 
 export default function ChangePassword() {
-  const { data: session } = useSession();
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [form, setForm] = useState({ oldPassword: "", newPassword: "" });
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
 
-  const handleChangePassword = async (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (newPassword !== confirmPassword) {
-      setError("New password and confirm password do not match");
-      return;
-    }
-
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     try {
+      const token = localStorage.getItem("token");
       const response = await fetch("/api/auth/change-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ oldPassword, newPassword }),
+        body: JSON.stringify({ ...form, token }),
       });
 
-      const result = await response.json();
-      if (response.ok) {
-        setMessage(result.message);
-        setError("");
-
-        // Optionally, log out the user after password change
-        await signOut({ redirect: false });
-      } else {
-        setError(result.message);
-        setMessage("");
-      }
-    } catch (err) {
-      console.error("Error changing password:", err);
-      setError("An error occurred while changing the password.");
+      const data = await response.json();
+      setMessage(data.message || data.error);
+    } catch (error) {
+      setMessage("An error occurred.");
     }
   };
 
-  if (!session) {
-    return <p>Please log in to change your password.</p>;
-  }
-
   return (
-    <div style={{ maxWidth: 400, margin: "0 auto", padding: "1rem" }}>
-      <h2>Change Password</h2>
-      {message && <p style={{ color: "green" }}>{message}</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <form onSubmit={handleChangePassword}>
-        <label>
-          Old Password:
-          <input
-            type="password"
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-            required
-          />
-        </label>
-        <br />
-        <label>
-          New Password:
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-          />
-        </label>
-        <br />
-        <label>
-          Confirm New Password:
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
-        </label>
-        <br />
+    <div>
+      <h1>Change Password</h1>
+      <form onSubmit={handleSubmit}>
+        <input
+          type="password"
+          name="oldPassword"
+          placeholder="Old Password"
+          onChange={(e) => setForm({ ...form, oldPassword: e.target.value })}
+          required
+        />
+        <input
+          type="password"
+          name="newPassword"
+          placeholder="New Password"
+          onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+          required
+        />
         <button type="submit">Change Password</button>
       </form>
+      {message && <p>{message}</p>}
     </div>
   );
 }

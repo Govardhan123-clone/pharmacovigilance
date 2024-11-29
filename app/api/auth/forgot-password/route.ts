@@ -1,31 +1,36 @@
-import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
+import { NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+import prisma from "@/app/lib/prisma";
 
-const prisma = new PrismaClient();
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_SERVER,
-  auth: { user: process.env.EMAIL_FROM, pass: process.env.EMAIL_PASSWORD },
-});
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
 
-export default async function handler(req, res) {
-  if (req.method === "POST") {
-    const { email } = req.body;
+export async function POST(request: Request) {
+  try {
+    const { email } = await request.json();
+
+    if (!email) {
+      return NextResponse.json({ error: "Email is required." }, { status: 400 });
+    }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) return res.status(404).json({ error: "User not found" });
 
-    const resetToken = bcrypt.hashSync(email, 10);
-    const resetUrl = `${process.env.NEXTAUTH_URL}/auth/reset-password?token=${resetToken}`;
+    if (!user) {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
 
-    await transporter.sendMail({
-      to: email,
-      subject: "Password Reset",
-      html: `<p>Click <a href="${resetUrl}">here</a> to reset your password.</p>`,
+    const resetToken = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, {
+      expiresIn: "15m",
     });
 
-    res.status(200).json({ message: "Password reset email sent" });
-  } else {
-    res.status(405).json({ message: "Method not allowed" });
+    // Here, you would send the resetToken to the user's email in a real application.
+    console.log("Reset Token:", resetToken);
+
+    return NextResponse.json({
+      message: "Password reset token generated. Check your email.",
+      resetToken, // Remove in production.
+    });
+  } catch (error) {
+    console.error("Error generating reset token:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }

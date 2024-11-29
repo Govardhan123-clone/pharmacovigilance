@@ -1,42 +1,59 @@
-// pages/api/auth/register.ts
-
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { NextApiRequest, NextApiResponse } from 'next';
+import jwt from 'jsonwebtoken';
+import prisma from '@/app/lib/prisma';
 
-const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret"; // Replace with a secure secret key
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
-  }
-
-  const { name, email, password } = req.body;
-
+export async function POST(request: Request) {
   try {
-    // Check if the user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
-    if (existingUser) {
-      return res.status(409).json({ message: 'User already exists' });
+    // Extract data from the request body
+    const { name, email, password, country, company, experienceLevel, expertiseAreas } = await request.json();
+
+    // Validate input data
+    if (!name || !email || !password || !country || !experienceLevel || !expertiseAreas || expertiseAreas.length === 0) {
+      return NextResponse.json({ error: 'All fields are required and expertise areas should not be empty.' }, { status: 400 });
     }
 
-    // Hash the password
+    // Check if the email is already taken
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return NextResponse.json({ error: 'Email already in use.' }, { status: 400 });
+    }
+
+    // Hash the user's password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create the new user
-    const user = await prisma.user.create({
+    // Create the new user in the database
+    const newUser = await prisma.user.create({
       data: {
         name,
         email,
         password: hashedPassword,
+        country,
+        company,  // Optional field, can be null in database
+        experienceLevel,
+        expertiseAreas: expertiseAreas || [], // Handle the case where expertiseAreas might be empty
       },
     });
 
-    res.status(201).json({ message: 'User registered successfully', user });
+    // Generate a JWT token for the newly registered user
+    const token = jwt.sign(
+      { id: newUser.id, email: newUser.email },
+      JWT_SECRET,
+      { expiresIn: "1h" } // Token expiration time
+    );
+
+    // Return a success response with user data and JWT token
+    return NextResponse.json({
+      message: 'User registered successfully.',
+      user: { id: newUser.id, name: newUser.name, email: newUser.email },
+      token,
+    });
+
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({ message: 'Registration failed' });
+    console.error('Error registering user:', error);
+    // Return a generic error message with a 500 status code
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
